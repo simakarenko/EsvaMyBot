@@ -8,6 +8,7 @@ import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
+import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import ua.kiev.prog.model.User;
@@ -24,6 +25,10 @@ public class ChatBot extends TelegramLongPollingBot {
 
     private static final String BROADCAST = "broadcast ";
     private static final String LIST_USERS = "users";
+    //команда для видалення свого облікового запису
+    private static final String DELETE = "delete_my_account";
+    //адмін команда присвоєння користувачу прав адміна
+    private static final String IS_ADMIN = "is_admin ";
 
     @Value("${bot.name}")
     private String botName;
@@ -58,6 +63,8 @@ public class ChatBot extends TelegramLongPollingBot {
         User user = userService.findByChatId(chatId);
 
         if (checkIfAdminCommand(user, text))
+            return;
+        if (deleteMyAccount(user, text))
             return;
 
         BotContext context;
@@ -108,14 +115,39 @@ public class ChatBot extends TelegramLongPollingBot {
             listUsers(user);
             return true;
         }
+        //присвоєння користувачеві прав адміністратора
+        else if (text.startsWith(IS_ADMIN)) {
+            LOGGER.info("Admin command received: " + IS_ADMIN);
+
+            text = text.substring(IS_ADMIN.length());
+            User u = userService.userIsAdmin(text);
+            if (u != null) {
+                sendPhoto(u.getChatId(), "isAdmin.png");
+                return true;
+            }
+            return false;
+        }
+        return false;
+    }
+
+    //метод для видалення свого облікового запису
+    private boolean deleteMyAccount(User user, String text) {
+        if (user == null || user.getAdmin())
+            return false;
+        if (text.equals(DELETE)) {
+            LOGGER.info("User command received: " + DELETE);
+            sendPhoto(user.getChatId(), "delete.png");
+            userService.deleteUser(user);
+            return true;
+        }
 
         return false;
     }
 
     private void sendMessage(long chatId, String text) {
-        SendMessage message = new SendMessage()
-                .setChatId(chatId)
-                .setText(text);
+        SendMessage message = new SendMessage();
+        message.setChatId(Long.toString(chatId));
+        message.setText(text);
         try {
             execute(message);
         } catch (TelegramApiException e) {
@@ -123,18 +155,25 @@ public class ChatBot extends TelegramLongPollingBot {
         }
     }
 
-    private void sendPhoto(long chatId) {
+    private void sendPhoto(long chatId, String namePhoto) {
         InputStream is = getClass().getClassLoader()
-                .getResourceAsStream("test.png");
+                .getResourceAsStream(namePhoto);
 
-        SendPhoto message = new SendPhoto()
-                .setChatId(chatId)
-                .setPhoto("test", is);
+        SendPhoto message = new SendPhoto();
+        message.setChatId(Long.toString(chatId));
+        message.setPhoto(new InputFile(is, parsingPhotoName(namePhoto)));
         try {
             execute(message);
         } catch (TelegramApiException e) {
             e.printStackTrace();
         }
+    }
+
+    //метод для розбору назви фото
+    private String parsingPhotoName(String namePhoto) {
+        int n = namePhoto.indexOf(".");
+        String name = namePhoto.substring(0, n);
+        return name;
     }
 
     private void listUsers(User admin) {
@@ -142,15 +181,15 @@ public class ChatBot extends TelegramLongPollingBot {
         List<User> users = userService.findAllUsers();
 
         users.forEach(user ->
-            sb.append(user.getId())
-                    .append(' ')
-                    .append(user.getPhone())
-                    .append(' ')
-                    .append(user.getEmail())
-                    .append("\r\n")
+                sb.append(user.getId())
+                        .append(' ')
+                        .append(user.getPhone())
+                        .append(' ')
+                        .append(user.getEmail())
+                        .append("\r\n")
         );
 
-        sendPhoto(admin.getChatId());
+        sendPhoto(admin.getChatId(), "test.png");
         sendMessage(admin.getChatId(), sb.toString());
     }
 

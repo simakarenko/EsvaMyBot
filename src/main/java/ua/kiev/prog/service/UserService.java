@@ -1,5 +1,6 @@
 package ua.kiev.prog.service;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ua.kiev.prog.model.User;
@@ -45,6 +46,18 @@ public class UserService {
     @Transactional
     public void updateUser(User user) {
         userRepository.save(user);
+    }
+
+    @Transactional
+    public void deleteUser(User user) {
+        userRepository.delete(user);
+    }
+
+    @Transactional
+    public User userIsAdmin(String phone) {
+        User u = userRepository.findByPhone(phone);
+        u.setAdmin(true);
+        return u;
     }
 }
 

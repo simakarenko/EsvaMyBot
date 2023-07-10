@@ -1,7 +1,11 @@
 package ua.kiev.prog.bot;
 
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.send.SendPhoto;
+import org.telegram.telegrambots.meta.api.objects.InputFile;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+
+import java.io.InputStream;
 
 public enum BotState {
 
@@ -9,6 +13,7 @@ public enum BotState {
         @Override
         public void enter(BotContext context) {
             sendMessage(context, "Hello!");
+            sendPhoto(context, "hi.png");
         }
 
         @Override
@@ -73,6 +78,8 @@ public enum BotState {
         }
     };
 
+    // --------------- //
+
     private static BotState[] states;
     private final boolean inputNeeded;
 
@@ -97,14 +104,36 @@ public enum BotState {
     }
 
     protected void sendMessage(BotContext context, String text) {
-        SendMessage message = new SendMessage()
-                .setChatId(context.getUser().getChatId())
-                .setText(text);
+        SendMessage message = new SendMessage();
+        message.setChatId(Long.toString(context.getUser().getChatId()));
+        message.setText(text);
         try {
             context.getBot().execute(message);
         } catch (TelegramApiException e) {
             e.printStackTrace();
         }
+    }
+
+    //метод для відправлення картинки при першому зверненні до чат-боту
+    protected void sendPhoto(BotContext context, String namePhoto) {
+        InputStream is = getClass().getClassLoader()
+                .getResourceAsStream(namePhoto);
+
+        SendPhoto message = new SendPhoto();
+        message.setChatId(Long.toString(context.getUser().getChatId()));
+        message.setPhoto(new InputFile(is, parsingPhotoName(namePhoto)));
+        try {
+            context.getBot().execute(message);
+        } catch (TelegramApiException e) {
+            e.printStackTrace();
+        }
+    }
+
+    //метод для розбору назви фото
+    public String parsingPhotoName(String namePhoto) {
+        int n = namePhoto.indexOf(".");
+        String name = namePhoto.substring(0, n);
+        return name;
     }
 
     public boolean isInputNeeded() {
@@ -116,5 +145,6 @@ public enum BotState {
     }
 
     public abstract void enter(BotContext context);
+
     public abstract BotState nextState();
 }
